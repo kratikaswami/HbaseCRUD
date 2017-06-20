@@ -1,0 +1,175 @@
+import java.io.IOException;
+//import java.util.ArrayList;
+import java.util.*;
+ 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.ZooKeeperConnectionException;
+import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.mapred.TableMapReduceUtil;
+import org.apache.hadoop.hbase.mapred.*;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class HBaseTest {
+
+	private static Configuration conf = null;
+	
+	static {
+		conf = HBaseConfiguration.create();
+    }
+	
+	public static void createTable(String tableName, String[] family) throws Exception{
+		HBaseAdmin admin = new HBaseAdmin(conf);
+		if(admin.tableExists(tableName)){
+			System.out.println("Table already existst");
+		}
+		else{
+			HTableDescriptor tabledes = new HTableDescriptor(tableName);
+			for(int i = 0; i< family.length;i++){
+				tabledes.addFamily(new HColumnDescriptor(family[i]));	
+			}
+			admin.createTable(tabledes);
+            System.out.println("create table " + tableName + " right away.");
+        
+		}
+	}
+	
+	public static void deleteTable(String tableName) throws Exception {
+        try {
+            HBaseAdmin admin = new HBaseAdmin(conf);
+            admin.disableTable(tableName);
+            admin.deleteTable(tableName);
+            System.out.println("delete table " + tableName + " ok.");
+        } catch (MasterNotRunningException e) {
+            e.printStackTrace();
+        } catch (ZooKeeperConnectionException e) {
+            e.printStackTrace();
+        }
+    }
+	
+	public static void addRecord(String tableName, String rowKey,
+            String family, String qualifier, String value) throws Exception {
+        try {
+            HTable table = new HTable(conf, tableName);
+            Put put = new Put(Bytes.toBytes(rowKey));
+            put.add(Bytes.toBytes(family), Bytes.toBytes(qualifier), Bytes
+                    .toBytes(value));
+            table.put(put);
+            System.out.println("insert recored " + rowKey + " to table "
+                    + tableName + " ok.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+	
+	public static void delRecord(String tableName, String rowKey)
+            throws IOException {
+        HTable table = new HTable(conf, tableName);
+        List<Delete> list = new ArrayList<Delete>();
+        Delete del = new Delete(rowKey.getBytes());
+        list.add(del);
+        table.delete(list);
+        System.out.println("del recored " + rowKey + " ok.");
+    }
+	
+	public static void getOneRecord (String tableName, String rowKey) throws IOException{
+        HTable table = new HTable(conf, tableName);
+        Get get = new Get(rowKey.getBytes());
+        Result rs = table.get(get);
+        for(KeyValue kv : rs.raw()){
+            System.out.print(new String(kv.getRow()) + " " );
+            System.out.print(new String(kv.getFamily()) + ":" );
+            System.out.print(new String(kv.getQualifier()) + " " );
+            System.out.print(kv.getTimestamp() + " " );
+            System.out.println(new String(kv.getValue()));
+        }
+    }
+	
+	public static void getAllRecord (String tableName) {
+        try{
+             HTable table = new HTable(conf, tableName);
+             Scan s = new Scan();
+             ResultScanner ss = table.getScanner(s);
+             for(Result r:ss){
+                 for(KeyValue kv : r.raw()){
+                    System.out.print(new String(kv.getRow()) + " ");
+                    System.out.print(new String(kv.getFamily()) + ":");
+                    System.out.print(new String(kv.getQualifier()) + " ");
+                    System.out.print(kv.getTimestamp() + " ");
+                    System.out.println(new String(kv.getValue()));
+                 }
+             }
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+    }
+	 public static void main(String[] agrs) {
+	        try {
+	        	Configuration conf = HBaseConfiguration.create();
+	        	Scanner s = new Scanner(System.in);
+	        	System.out.println("Enter the table name");
+	            String tablename = s.nextLine();
+	            System.out.println("Enter column family 1 and 2");
+	            String a = s.nextLine();
+	            String b = s.nextLine();
+	            String[] familys = { a, b };
+	            HBaseTest.createTable(tablename, familys);
+	 
+	            
+	            HBaseTest.addRecord(tablename, "amazon", a, "pen", "5");
+	            HBaseTest.addRecord(tablename, "amazon", b, "pen", "90");
+	            HBaseTest.addRecord(tablename, "ebay", b,"pen", "97");
+	            HBaseTest.addRecord(tablename, "amazon", b, "paper", "87");
+	            
+	            HBaseTest.addRecord(tablename, "amazon", a, "pen", "4");
+	            HBaseTest.addRecord(tablename, "ebay", a, "paper", "89");
+	            HBaseTest.addRecord(tablename, "target", a, "paper", "89");
+	 
+	            System.out.println("get one record");
+	            HBaseTest.getOneRecord(tablename, "amazon");
+	 
+	            System.out.println("show all record");
+	            HBaseTest.getAllRecord(tablename);
+	 
+	            System.out.println("del one record");
+	            HBaseTest.delRecord(tablename, "target");
+	            HBaseTest.getAllRecord(tablename);
+	 
+	            System.out.println("show sale analysis");
+	            HBaseTest.getAllRecord(tablename);
+	            
+	            Job job = new Job();
+	            job.setJarByClass(HBaseTest.class);
+	            job.setJobName("Sales Analysis");
+	            
+	            Scan scan = new Scan();
+	            scan.addFamily(Bytes.toBytes("a"));
+	            job.setMapperClass(TestMapper.class);
+	            job.setReducerClass(TestReducer.class);
+
+	            job.setOutputKeyClass(Text.class);
+	            job.setOutputValueClass(IntWritable.class);
+	            
+	                        
+	        } catch (Exception e) {
+	            e.printStackTrace();
+	        }
+	    }
+}
