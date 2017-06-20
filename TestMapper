@@ -1,0 +1,43 @@
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapreduce.TableMapReduceUtil;
+import org.apache.hadoop.hbase.mapreduce.TableMapper;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+
+import com.kenai.jaffl.mapper.FunctionMapper.Context;
+
+import java.io.IOException;
+import java.util.Calendar;
+
+
+public class TestMapper extends TableMapper  {
+	private LongWritable ONE = new LongWritable( 1 );
+
+   
+
+    
+    public void map(ImmutableBytesWritable rowKey, Result columns, Context context)
+    		   throws IOException, InterruptedException
+
+    {
+
+
+        String inKey = new String(rowKey.get());
+        byte[] bSales = columns.getValue(Bytes.toBytes("a"), Bytes.toBytes("pen"));
+        String sSales = new String(bSales);
+        Integer sales = new Integer(sSales);
+
+        // Output the current hour of day and a count of 1
+        context.write( new LongWritable( sales ), ONE );
+    }
+	
+}
